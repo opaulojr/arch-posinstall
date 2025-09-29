@@ -22,9 +22,90 @@ error() {
     exit 1
 }
 
+PKG_REMOVE_LIST=(
+    cheese
+    epiphany
+    gnome-contacts
+    gnome-maps
+    gnome-music
+    gnome-software
+    gnome-tour
+    gnome-weather
+    showtime
+    vlc
+    totem
+    vim
+)
+
+run_with_spinner() {
+    local msg_running
+    local msg_done
+    local use_dual_msg=false
+
+    if [ $# -ge 3 ]; then
+        msg_running="$1"
+        msg_done="$2"
+        shift 2
+        use_dual_msg=true
+    else
+        msg_running="$1"
+        msg_done="$1"
+        shift 1
+    fi
+
+    local cmd=("$@")
+
+    local delay=0.1
+    local spinstr='⠀⠀⠀⠉⠉⠉⠛⠛⠛⠿⠿⣿⣿⣿⣿'
+
+    mapfile -t spinarr < <(echo -n "$spinstr" | grep -o .)
+
+    "${cmd[@]}" &> /dev/null &
+    local pid=$!
+
+    local i=0
+    while kill -0 $pid 2>/dev/null; do
+        local c=${spinarr[i++ % ${#spinarr[@]}]}
+        printf "\r\e[1;34m  %s\e[0m %s" "$c" "$msg_running"
+        sleep "$delay"
+    done
+
+    wait $pid
+    local exit_code=$?
+
+    if [ $exit_code -eq 0 ]; then
+        printf "\r\e[1;32m  ✔\e[0m %s\n" "$msg_done"
+    else
+        printf "\r\e[1;31m  ✖\e[0m %s\n" "$msg_running"
+    fi
+
+    return $exit_code
+}
+
 # --- Update system ---
+echo
 log "Updating the system..."
-pacman -Syu --noconfirm || error "Failed to update the system"
+echo
+run_with_spinner "Updating..." "Updated!" pacman -Syyu --noconfirm || error "Failed to update the system"
 
-# --- ... ---
+# --- Cleaning system ---
+remove_pkgs() {
+echo
+    log "Removing packages..."
+    echo
 
+    for pkg in "${PKG_REMOVE_LIST[@]}"; do
+        if pacman -Q "$pkg" &> /dev/null; then
+            run_with_spinner " $pkg..." " $pkg" pacman -Rns --noconfirm "$pkg"
+        else
+            printf "\r\e[1;33m  ✖  %s\e[0m\n" "$pkg"
+        fi
+    done
+}
+
+# --- RUNING ---
+main() {
+    remove_pkgs
+}
+
+main
