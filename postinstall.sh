@@ -21,6 +21,14 @@ PKG_REMOVE_LIST=(
     vim
 )
 
+OPTIONAL_APPS=(
+    firefox
+    git
+    celluloid
+    fragments
+)
+
+
 run_with_spinner() {
     local msg_running
     local msg_done
@@ -88,7 +96,7 @@ update_system() {
     log "Updating the system..."
     echo
 
-    run_with_spinner " Updating..." " Updated!" pacman -Syyu --noconfirm || error "Failed to update the system"
+    run_with_spinner " Updating" " Updated!" pacman -Syyu --noconfirm || error "Failed to update the system"
 }
 
 # --- Cleaning system ---
@@ -99,7 +107,7 @@ remove_pkgs() {
 
     for pkg in "${PKG_REMOVE_LIST[@]}"; do
         if pacman -Q "$pkg" &> /dev/null; then
-            run_with_spinner " $pkg..." " $pkg" pacman -Rns --noconfirm "$pkg"
+            run_with_spinner " $pkg" " $pkg" pacman -Rns --noconfirm "$pkg"
             sleep 1
         else
             printf "\r\e[1;33m  ✖  %s\e[0m\n" "$pkg"
@@ -115,7 +123,7 @@ edit_pacman_conf() {
     sed -i '/^#Color$/{
         s/^#//
         a\
-IloveCandy
+ILoveCandy
     }' "$PACMAN_CONF" || return 1
 }
 
@@ -131,9 +139,40 @@ edit_configs() {
     log "Editing files..."
     echo
 
-    run_with_spinner " Editing pacman.conf..." " pacman.conf edited!" edit_pacman_conf || error "Failed to edit pacman.conf"
+    run_with_spinner " Editing pacman.conf" " pacman.conf edited!" edit_pacman_conf || error "Failed to edit pacman.conf"
 
-    run_with_spinner " Editing loader.conf..." " loader.conf edited!" edit_loader_conf || error "Failed to edit loader.conf"
+    run_with_spinner " Editing loader.conf" " loader.conf edited!" edit_loader_conf || error "Failed to edit loader.conf"
+}
+
+install_pkgs() {
+    echo
+    log "Installing optional pkgs..."
+    echo
+
+    for pkg in "${OPTIONAL_APPS[@]}"; do
+        if pacman -Qi "$pkg" &> /dev/null; then
+            printf "\r\e[1;33m  ✖  \033[0;35m%s\e[0m already installed\n" "$pkg"
+            continue
+        fi
+
+        read -rp "Do you want to install \"$pkg\"? [Y/n]: " response
+        printf "\033[1A"  # move cursor up
+        printf "\033[2K"  # clear line
+        response="${response,,}"  # to lowercase
+
+        if [[ -z "$response" || "$response" == "y" || "$response" == "yes" ]]; then
+            case "$pkg" in
+                firefox|steam)
+                    sudo pacman -S --noconfirm "$pkg" > /dev/null
+                    ;;
+                *)
+                    run_with_spinner " Installing $pkg" " $pkg Installed" sudo pacman -S --noconfirm "$pkg"
+                    ;;
+            esac
+        else
+            printf "\r\e[1;33m  ✖  \e[1;33m%s\e[0m skipped\n" "$pkg"
+        fi
+    done
 }
 
 # --- RUNNING ---
@@ -141,6 +180,7 @@ main() {
     update_system
     remove_pkgs
     edit_configs
+    install_pkgs
 }
 
 main
