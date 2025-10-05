@@ -4,7 +4,7 @@
 #   Arch Post-Installation Script
 # ================================
 
-set -e  # Exit on error
+set -e
 
 PKG_REMOVE_LIST=(
     cheese
@@ -125,6 +125,9 @@ edit_pacman_conf() {
         a\
 ILoveCandy
     }' "$PACMAN_CONF" || return 1
+
+    sed -i 's/^#\(\[multilib\]\)/\1/' "$PACMAN_CONF" || return 1
+    sed -i 's|^#\(Include = /etc/pacman.d/mirrorlist\)|\1|' "$PACMAN_CONF" || return 1
 }
 
 edit_loader_conf() {
@@ -156,9 +159,9 @@ install_pkgs() {
         fi
 
         read -rp "Do you want to install \"$pkg\"? [Y/n]: " response
-        printf "\033[1A"  # move cursor up
-        printf "\033[2K"  # clear line
-        response="${response,,}"  # to lowercase
+        printf "\033[1A"
+        printf "\033[2K"
+        response="${response,,}"
 
         if [[ -z "$response" || "$response" == "y" || "$response" == "yes" ]]; then
             case "$pkg" in
